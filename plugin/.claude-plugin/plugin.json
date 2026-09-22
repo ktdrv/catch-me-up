@@ -1,0 +1,9 @@
+{
+  "name": "catch-me-up",
+  "version": "0.1.0",
+  "description": "Narrate the stretch of an agent session you weren't watching, and flag where it drifted from what you asked for",
+  "author": { "name": "Kaloyan Todorov" },
+  "repository": "https://github.com/ktdrv/catch-me-up",
+  "license": "MIT",
+  "keywords": ["claude-code", "skill", "transcript", "session", "recap", "summary", "drift"]
+}

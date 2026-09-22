@@ -1,0 +1,13 @@
+{
+  "name": "catch-me-up",
+  "owner": { "name": "Kaloyan Todorov" },
+  "metadata": { "description": "catch-me-up — session narration for Claude Code" },
+  "plugins": [
+    {
+      "name": "catch-me-up",
+      "version": "0.1.0",
+      "source": "./plugin",
+      "description": "Narrate the stretch of an agent session you weren't watching, and flag where it drifted from what you asked for"
+    }
+  ]
+}
