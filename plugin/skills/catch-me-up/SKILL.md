@@ -19,37 +19,33 @@ The output format below comes from a prompt Sam, an engineer at Anthropic, share
 
 ## Step 1 — find the transcript
 
-The session id is the UUID in your scratchpad path — if your scratchpad is `/private/tmp/claude-501/-Users-you/0000e1b3-92fc-4d24-89a3-83315d3d96fc/scratchpad`, the session id is `0000e1b3-92fc-4d24-89a3-83315d3d96fc`.
+This session's id is `${CLAUDE_SESSION_ID}`. The script finds the transcript from the id alone.
 
-The project directory is `~/.claude/projects/<cwd with every / replaced by ->`. For `/Users/you/repo` that's `~/.claude/projects/-Users-you-repo`.
-
-If you can't work out the session id, omit `--session` and the script takes the most recently modified transcript in that directory — correct in practice, because the live session is the one being appended to right now.
+If that id didn't get filled in, omit `--session` and pass `--project "$PWD"` instead: the script takes the most recently modified transcript for that project — correct in practice, because the live session is the one being appended to right now.
 
 ## Step 2 — extract the timeline
 
-```bash
-uv run --no-project ~/.claude/skills/catch-me-up/transcript.py \
-  --project-dir ~/.claude/projects/<slug> --session <uuid>
-```
-
-It prints every instruction the user gave this session, then the ordered action log since the anchor — the instruction that began the longest unbroken stretch of agent-only activity, which is the span they weren't watching. If that stretch was launched by a bare "yes", it backs up to the instruction the yes was approving.
-
-**Check the anchor before you trust it.** If the numbered list shows the anchor is a mid-task correction rather than the start of the task, re-run with `--from N` pointing at the instruction that actually began the work. `--all` covers the whole session. Do this yourself; don't make the subagent guess.
-
-Don't read the output. Pipe it to a file in your scratchpad and hand over the path.
+Don't read the output. Write it to a fresh directory and hand over the path the command prints:
 
 ```bash
-uv run --no-project ~/.claude/skills/catch-me-up/transcript.py ... > "$SCRATCH/timeline.md"
+out="$(mktemp -d "${TMPDIR:-/tmp}/catch-me-up.XXXXXX")/timeline.md" && \
+  uv run --no-project "${CLAUDE_SKILL_DIR}/transcript.py" --session ${CLAUDE_SESSION_ID} > "$out" && echo "$out"
 ```
+
+It lists every instruction the user gave this session, then the ordered action log since the anchor — the instruction that began the longest unbroken stretch of agent-only activity, which is the span they weren't watching. If that stretch was launched by a bare "yes", it backs up to the instruction the yes was approving.
+
+**Check the anchor before you trust it.** Read only the instruction list and the action log's heading (`sed -n '/^## Instructions/,/^## Action log/p' <path it printed>` — `$out` is gone by your next command). If the anchor is a mid-task correction rather than the start of the task, re-run with `--from N` pointing at the instruction that actually began the work. `--all` covers the whole session. Do this yourself; don't make the subagent guess.
+
+Never pick the directory yourself. Other sessions run this skill at the same time, and any fixed path — `/tmp/catchup/`, a name you made up — lets the later run overwrite the earlier one's timeline before its narrator reads it.
 
 ## Step 3 — dispatch the narrator
 
 One subagent, **model: sonnet**, `subagent_type: general-purpose`. It gets the file path and the brief below and nothing else from your session — no summary of what you think happened, no framing, no defense. Contaminating it defeats the point.
 
-Fill in the placeholder and send it verbatim:
+Fill in the placeholder with the path Step 2 printed and send it verbatim:
 
 ```
-Read <SCRATCH>/timeline.md. It is a reconstruction of a Claude Code session: every
+Read <TIMELINE>. It is a reconstruction of a Claude Code session: every
 instruction the user gave, then the ordered log of what the agent actually did.
 
 The user stepped away during this work and is coming back cold. Write them a catch-up.

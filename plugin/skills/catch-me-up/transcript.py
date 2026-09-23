@@ -81,12 +81,26 @@ def find_session(session: str | None, provider: str, project: str | None):
             sys.exit(f"no {provider} session {session}")
         return match[0]
     if project:
-        found = [s for s in found if s.project_path and project in str(s.project_path)]
+        # project_path is the transcript directory, whose name is the cwd with every
+        # non-alphanumeric turned into "-". Slug the argument so a real path matches.
+        # A full path must match the whole name: worktrees get "<repo>--claude-
+        # worktrees-..." directories, and a substring match would pick their sessions.
+        slug = re.sub(r"[^A-Za-z0-9]", "-", project)
+        if project.startswith("/"):
+            found = [s for s in found if s.project_path and s.project_path.name == slug]
+        else:
+            found = [s for s in found if s.project_path and slug in str(s.project_path)]
     if not found:
         sys.exit(f"no {provider} sessions found"
                  + (f" for project matching {project!r}" if project else ""))
-    # discover_all_sessions leaves updated_at unset, so sort on the file itself.
-    found.sort(key=lambda s: s.source_path.stat().st_mtime if s.source_path else 0)
+    # discover_all_sessions leaves updated_at and source_path unset, so sort on the
+    # file itself. For claude, project_path is the transcript directory. Without
+    # this every mtime was 0 and the pick fell to discovery order, not the live one.
+    def mtime(s) -> float:
+        path = s.source_path or (s.project_path and s.project_path / f"{s.session_id}.jsonl")
+        return path.stat().st_mtime if path and path.exists() else 0
+
+    found.sort(key=mtime)
     return found[-1]
 
 
@@ -206,7 +220,7 @@ def main() -> None:
     ap.add_argument("--session", help="session uuid; defaults to the newest transcript")
     ap.add_argument("--provider", default="claude",
                     help="harness whose transcripts to read (default: claude)")
-    ap.add_argument("--project", help="substring of the project path, to disambiguate")
+    ap.add_argument("--project", help="project directory, or part of its path, to disambiguate")
     ap.add_argument("--all", action="store_true",
                     help="whole session, not just since the anchor")
     ap.add_argument("--from", dest="start_at", type=int, metavar="N",
